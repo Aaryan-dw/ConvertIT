@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ConvertIT - Audio to Video</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            background: #fff;
+            padding: 20px;
+            margin: 50px auto;
+            width: 500px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            text-align: left;
+        }
+
+        h2 {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: #333;
+            text-align: center;
+        }
+
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        input[type="file"], select, button {
+            width: 100%;
+            padding: 8px;
+            margin-top: 4px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            cursor: pointer;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            transition: background-color 0.3s;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .note {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .preview {
+            margin-top: 10px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .preview audio, .preview video {
+            width: 100%;
+            max-height: 150px;
+        }
+        
+        .preview img {
+            max-width: 100%;
+            max-height: 100px;
+            border-radius: 5px;
+        }
+        
+        .loading-bar {
+            width: 100%;
+            height: 4px;
+            background-color: #f0f0f0;
+            border-radius: 2px;
+            margin-top: 10px;
+            display: none;
+            overflow: hidden;
+        }
+        
+        .loading-progress {
+            width: 0%;
+            height: 100%;
+            background-color: #007BFF;
+            border-radius: 2px;
+            animation: loading 2s infinite;
+        }
+        
+        @keyframes loading {
+            0% { width: 0%; }
+            50% { width: 70%; }
+            100% { width: 100%; }
+        }
+        
+        .loading-text {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            margin-top: 5px;
+            display: none;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            text-align: center;
+            width: 100%;
+            color: #007BFF;
+            text-decoration: none;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .next-file-btn {
+            background-color: #28a745;
+            margin-top: 10px;
+        }
+        
+        .next-file-btn:hover {
+            background-color: #218838;
+        }
+        
+        .queue-info {
+            background-color: #e9ecef;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 12px;
+            text-align: center;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                width: 90%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Audio to Video Converter</h2>
+    
+    <div class="queue-info" id="queueInfo" style="display:none;">
+        <strong>Files in queue:</strong> <span id="queueCount">0</span>
+    </div>
+    
+    <form action="/convert" method="POST" enctype="multipart/form-data" id="audioForm">
+        <input type="hidden" name="type" value="audio_to_video">
+        <input type="hidden" name="session_id" id="sessionId" value="">
+
+        <label>Audio File:</label>
+        <input type="file" name="file" accept="audio/*" required id="audioFile">
+        <div class="preview" id="audioPreview"></div>
+
+        <label>Image (optional):</label>
+        <input type="file" name="image" accept="image/*" id="imageFile">
+        <div class="preview" id="imagePreview"></div>
+        <div class="note">Leave empty to use background color</div>
+
+        <label>Choose Background Color:</label>
+        <input type="color" name="color" value="#000000">
+
+        <label>Output Format:</label>
+        <select name="format">
+            <option value="mp4">MP4</option>
+            <option value="mkv">MKV</option>
+        </select>
+
+        <button type="submit" id="convertBtn">Convert</button>
+        <button type="button" id="nextFileBtn" class="next-file-btn" style="display:none;">+ Add Next File</button>
+        <div class="loading-bar" id="loadingBar">
+            <div class="loading-progress"></div>
+        </div>
+        <div class="loading-text" id="loadingText">Converting, please wait...</div>
+    </form>
+    <a href="/" class="back-link">← Back to Home</a>
+</div>
+
+<script>
+    let sessionId = localStorage.getItem('audio_session_id') || '';
+    let fileQueue = JSON.parse(localStorage.getItem('audio_queue') || '[]');
+    
+    // Set session ID
+    if (!sessionId) {
+        sessionId = generateUUID();
+        localStorage.setItem('audio_session_id', sessionId);
+    }
+    document.getElementById('sessionId').value = sessionId;
+    
+    // Update queue display
+    function updateQueueDisplay() {
+        const queueInfo = document.getElementById('queueInfo');
+        const queueCount = document.getElementById('queueCount');
+        const nextFileBtn = document.getElementById('nextFileBtn');
+        
+        if (fileQueue.length > 0) {
+            queueInfo.style.display = 'block';
+            queueCount.textContent = fileQueue.length;
+            nextFileBtn.style.display = 'block';
+        } else {
+            queueInfo.style.display = 'none';
+            nextFileBtn.style.display = 'none';
+        }
+    }
+    
+    // Generate UUID
+    function generateUUID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+    
+    // Audio Preview
+    const audioFile = document.getElementById('audioFile');
+    if (audioFile) {
+        audioFile.addEventListener('change', function(e) {
+            const file = this.files[0];
+            const previewDiv = document.getElementById('audioPreview');
+            if (!file) {
+                previewDiv.innerHTML = '';
+                return;
+            }
+            
+            previewDiv.innerHTML = '';
+            
+            if (file.type.startsWith('audio/')) {
+                const audio = document.createElement('audio');
+                audio.controls = true;
+                audio.src = URL.createObjectURL(file);
+                previewDiv.appendChild(audio);
+            }
+        });
+    }
+    
+    // Image Preview
+    const imageFile = document.getElementById('imageFile');
+    if (imageFile) {
+        imageFile.addEventListener('change', function(e) {
+            const file = this.files[0];
+            const previewDiv = document.getElementById('imagePreview');
+            if (!file) {
+                previewDiv.innerHTML = '';
+                return;
+            }
+            
+            previewDiv.innerHTML = '';
+            
+            if (file.type.startsWith('image/')) {
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(file);
+                previewDiv.appendChild(img);
+            }
+        });
+    }
+    
+    // Add to queue and reset form
+    function addToQueueAndReset() {
+        const audioInput = document.getElementById('audioFile');
+        const imageInput = document.getElementById('imageFile');
+        const colorInput = document.querySelector('input[name="color"]');
+        const formatSelect = document.querySelector('select[name="format"]');
+        
+        if (audioInput.files.length > 0) {
+            const queueItem = {
+                audio: audioInput.files[0].name,
+                audioData: audioInput.files[0],
+                image: imageInput.files[0] ? imageInput.files[0].name : null,
+                imageData: imageInput.files[0] || null,
+                color: colorInput.value,
+                format: formatSelect.value
+            };
+            
+            fileQueue.push(queueItem);
+            localStorage.setItem('audio_queue', JSON.stringify(fileQueue));
+            
+            // Reset form
+            audioInput.value = '';
+            imageInput.value = '';
+            document.getElementById('audioPreview').innerHTML = '';
+            document.getElementById('imagePreview').innerHTML = '';
+            
+            updateQueueDisplay();
+        }
+    }
+    
+    // Process next file
+    async function processNextFile() {
+        if (fileQueue.length === 0) return;
+        
+        const nextItem = fileQueue[0];
+        const formData = new FormData();
+        
+        formData.append('type', 'audio_to_video');
+        formData.append('session_id', sessionId);
+        formData.append('color', nextItem.color);
+        formData.append('format', nextItem.format);
+        
+        // Create file objects from stored data
+        const audioBlob = nextItem.audioData;
+        const audioFileObj = new File([audioBlob], nextItem.audio, {type: audioBlob.type});
+        formData.append('file', audioFileObj);
+        
+        if (nextItem.imageData) {
+            const imageBlob = nextItem.imageData;
+            const imageFileObj = new File([imageBlob], nextItem.image, {type: imageBlob.type});
+            formData.append('image', imageFileObj);
+        }
+        
+        // Show loading
+        const loadingBar = document.getElementById('loadingBar');
+        const loadingText = document.getElementById('loadingText');
+        const convertBtn = document.getElementById('convertBtn');
+        
+        loadingBar.style.display = 'block';
+        loadingText.style.display = 'block';
+        if (convertBtn) convertBtn.disabled = true;
+        
+        try {
+            const response = await fetch('/convert', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.text();
+            
+            // Remove processed file from queue
+            fileQueue.shift();
+            localStorage.setItem('audio_queue', JSON.stringify(fileQueue));
+            updateQueueDisplay();
+            
+            // Process next file if any
+            if (fileQueue.length > 0) {
+                await processNextFile();
+            } else {
+                // All files processed
+                loadingBar.style.display = 'none';
+                loadingText.style.display = 'none';
+                if (convertBtn) convertBtn.disabled = false;
+                alert('All files converted successfully!');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            loadingBar.style.display = 'none';
+            loadingText.style.display = 'none';
+            if (convertBtn) convertBtn.disabled = false;
+            alert('Error processing file');
+        }
+    }
+    
+    // Handle form submit
+    const audioForm = document.getElementById('audioForm');
+    if (audioForm) {
+        audioForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const audioInput = document.getElementById('audioFile');
+            if (!audioInput.files.length) return;
+            
+            // If there are files in queue, add current to queue
+            if (fileQueue.length > 0) {
+                addToQueueAndReset();
+                return;
+            }
+            
+            // Process current file
+            const formData = new FormData(audioForm);
+            formData.append('session_id', sessionId);
+            
+            const loadingBar = document.getElementById('loadingBar');
+            const loadingText = document.getElementById('loadingText');
+            const convertBtn = document.getElementById('convertBtn');
+            
+            loadingBar.style.display = 'block';
+            loadingText.style.display = 'block';
+            if (convertBtn) convertBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/convert', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.text();
+                
+                // Check if there are queued files
+                if (fileQueue.length > 0) {
+                    await processNextFile();
+                } else {
+                    loadingBar.style.display = 'none';
+                    loadingText.style.display = 'none';
+                    if (convertBtn) convertBtn.disabled = false;
+                    
+                    // Show result in new window
+                    const newWindow = window.open();
+                    newWindow.document.write(result);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                loadingBar.style.display = 'none';
+                loadingText.style.display = 'none';
+                if (convertBtn) convertBtn.disabled = false;
+                alert('Error processing file');
+            }
+        });
+    }
+    
+    // Next file button
+    const nextFileBtn = document.getElementById('nextFileBtn');
+    if (nextFileBtn) {
+        nextFileBtn.addEventListener('click', addToQueueAndReset);
+    }
+    
+    updateQueueDisplay();
+</script>
+
+</body>
+</html>

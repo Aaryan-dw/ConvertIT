@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ConvertIT</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            background: #fff;
+            padding: 40px;
+            margin: 100px auto;
+            width: 500px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 15px 30px;
+            background-color: #ffffff;
+            color: rgb(0, 0, 0);
+            text-decoration: none;
+            border: rgb(16, 10, 10) solid 1px;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+
+        .btn:hover {
+            background-color: #757575;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                width: 90%;
+                margin: 50px auto;
+            }
+            
+            .buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>ConvertIT</h1>
+    <div class="buttons">
+        <!-- <a href="/audio" class="btn">Audio to Video Converter</a> -->
+        <a href="/video" class="btn">Video to Audio Converter</a>
+    </div>
+</div>
+
+</body>
+</html>
